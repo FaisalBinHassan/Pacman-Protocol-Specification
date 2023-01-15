@@ -1,0 +1,491 @@
+   -> Student id = 22167238
+
+                                       - - - - - - - - - - - - - - - - -
+                                      |  Pacman Protocol Specification  |
+                                       - - - - - - - - - - - - - - - - -
+
+=====================================================================================================
+
+
+                                                 Terminology
+
+=====================================================================================================
+
+
+This specification uses terms MUST, SHOULD, and MAY as defined in RFC 2119 [rfc2119].
+
+The Pacman Protocol Specification uses a couple of terminologies and messages to define and clear the game
+instructors through the implementation. The Pacman terminologies makes an ideal clearness on distinguishing the
+pacman being either a visitor or local and the status of multiple other game objects. These terminologies are limited
+to LOCAL -> he game object is a local game object, and is on the local screen, AWAY -> The main user pacman is
+current away on the remote screen , REMOTE -> A game object on the remote screen that our AWAY pacman might
+interact with and FOREIGN -> The other player's pacman, when it is visiting our screen.
+
+While the Pacman Protocol Specification running over a TCP protocol, on a port of 6272. The protocol runs over
+multiple messages that reveal the game transitions between both users. These messages are the following :
+    1. Maze update
+    2. Pacman left
+    3. Pacman dead
+    4. Pacman go home
+    5. Pacman update
+    6. Ghost update
+    7. Ghost was eaten
+    8. Foreign pacman ate ghost
+    9. eat
+    10. Score update
+    12. Lives update
+    13. Status update
+
+The game is started as all states been set on STARTUP, once proceeded and game is rolled, the states can be changed
+into either CHASE or FRIGHTEN state. The game endless are maintained in these scenarios :
+  - PLAYER LOSES LAST LIFE :
+                -> The game ends, and goes to GAME OVER state, and MUST sends a STATUS_UPDATE message.
+                   The remote computer also moves to GAME OVER state.
+  - GAME OVER :
+                -> Once game is over, the player can choose to restart, by doing that the LOCAL computer goes to
+                 READY to RESTART state and send a STATUS_UPDATE message.
+
+
+
+
+=====================================================================================================
+
+                                               Starting The Game
+
+=====================================================================================================
+
+To start the pacman game, a couple of steps should be perceived, such as connecting both players and the server
+choosing the maze shape. Once a connection has been established, the server user should apply a password and sends
+a INITIALIZE message to the other. The contents of the initialize message are:
+
+    --> Type : INITIALIZE
+
+    --> Server Password : The password is arranged of 4 digits, the password can go up to 9999, this concludes that
+                          a password is 14 bits ranging on = 2 bytes.
+
+    --> Password Apply : An integer 1 is sent if the password does apply to the actual password chosen, Otherwise
+                         integer 0 is sent to the remote computer. Once an integer 1 has been delivered, the game
+                         starts else it doesn't since password doesn't match.
+
+
+
+=====================================================================================================
+
+
+                                                 Message Contents
+
+=====================================================================================================
+
+
+=> The contents of a [ UPDATES ] message are:
+_____________________________________________________________________________________________________
+
+    1. Type : UPDATES
+
+    2. Game Messages :
+
+        - Pacman Updates:
+
+                + Positions :
+                          The pacman has X and Y coordinates, as they reveal the location of the pacman in the maze
+                          the X-coordinate of the pacman shows the distance aside the screen (from left to
+                          right). The coordinates are 0 to the left player 1 screen and 1023 the right of the screen.
+                          Y-coordinate of the pacman shows the distance across the screen from 0 to 1023, where 0 is
+                          the top of player 1 screen and 1023 is the bottom of screen.
+
+                + Directions :
+                          The direction of the pacman can be chosen from 4 directions where the pacman stands at,
+                          it assumes that position from the pacman is SOUTH = 0, NORTH = 1,  EAST = 2, WEST = 3.
+
+                + Speed :
+                          The protocol assumes that STABLE = 0 ad MOVING = 1. The speed of the pacman is constant at
+                          80 pixels per second.
+
+        - Ghost Updates:
+
+                + Positions :
+                          The Ghost has X and Y coordinates, as they reveal the location of the Ghost in the maze
+                          the X-coordinate of the Ghost shows the distance aside the screen (from left to
+                          right). The coordinates are 0 to the left player 1 screen and 1023 the right of the screen.
+                          Y-coordinate of the Ghost shows the distance across the screen from 0 to 1023, where 0 is
+                          the top of player 1 screen and 1023 is the bottom of screen.
+
+                + Directions :
+                          The direction of the Ghost can be chosen from 4 directions where the Ghost stands at,
+                          it assumes that position from the Ghost is SOUTH = 0, NORTH = 1,  EAST = 2, WEST = 3.
+
+                + Speed :
+                          The protocol assumes that STABLE = 0 ad MOVING = 1. The speed of the Ghost is constant at
+                          80 pixels per second.
+
+                + Mode :
+                          The ghost mode can be obtained with either being FRIGHTEN or CHASE. These mode selections
+                          can be assumed by either SCATTER = 0, CHASE = 1, FRIGHTEN = 2, FRIGHTEN_TRAPPED = 3
+                          EYES = 4. The mode is ranged from 0 to 4 (5 modes), are the possible numbering of ghosts
+                          modes.
+
+                + Ghost chosen :
+                          There are 4 ghosts in the game, this being said, an integer counter ranging from 0 to 3,
+                          are the possible numbering of ghosts to number.
+
+________________________________________________________________________________________________________________________
+
+=> The contents of a [ MAZE UPDATE ] message are:
+________________________________________________________________________________________________________________________
+
+    1. Type : MAZE UPDATES
+
+    2. Game Messages :
+
+        - Maze:
+            + Shape of the maze is binary, which includes walls, food, etc.
+
+                -> The protocol assumes that: [ 4 bits for the 12 character ]
+                        _____________________
+                        |  Maze    | Integer |
+                        |  Symbols |         |
+                        _____________________
+                        |  " /-"   |     0   |
+                        |  "-/ "   |     1   |
+                        |  "---"   |     2   |
+                        |  "-\\"   |     3   |
+                        |  "\\-"   |     4   |
+                        |  " | "   |     5   |
+                        |  "###"   |     6   |
+                        |  " A "   |     7   |
+                        |  " B "   |     8   |
+                        |  "   "   |     9   |
+                        |  " . "   |    10   |
+                        |  " * "   |    11   |
+                        _____________________
+
+                -> Maze Encoding will be identified by :
+                      * There are 868 blocks (84/3 x 31) = 868 :
+                           - Column : The maze can be an integer between 0 and 2^5-1 representing the 28 columns. Since
+                                      this layout, the encoding will be delt in blocks, and each block will handle a 1
+                                      column.
+                           - Row    : The maze can be an integer between 0 and 2^5-1 representing the 31 rows. Since
+                                      this layout, the encoding will be delt in blocks, and each block will handle a 1
+                                      row.
+                       * For each block which is equivalent to = 434 bytes.
+
+                -> Bits sort out of the MAZE :
+                    - Blocks = 868 blocks with 434 bytes as all.
+                    - Each Block = 4 bits for the character.
+
+
+________________________________________________________________________________________________________________________
+
+=> The contents of a [ DIED ] message are:
+________________________________________________________________________________________________________________________
+
+
+    1. Type : DIED
+
+    2. Game Messages :
+
+        - ghost was eaten:
+                + An integer 1 is sent if LOCAL ghost dies in LOCAL maze. Otherwise integer 0 is
+                  sent to the remote computer.
+
+        - pacman died:
+                + An integer 1 is sent if LOCAL pacman dies in LOCAL maze. Otherwise integer 0 is
+                  sent to the remote computer.
+
+        - foreign pacman ate ghost:
+                + An integer 1 is sent if LOCAL ghost was eaten by the FOREIGN pacman. Otherwise integer 0 is
+                  Sent to the remote computer.
+
+________________________________________________________________________________________________________________________
+
+=> The contents of a [ ALERTS ] message are:
+________________________________________________________________________________________________________________________
+
+
+    1. Type : ALERTS
+
+    2. Game Messages :
+
+        - pacman go home:
+                + An integer 1 is sent if AWAY pacman has to be forcibly sent to LOCAL maze. Otherwise integer
+                  0 is sent to the remote computer.
+
+        - eat:
+                + The (eat) message has multiple steps to encounter, such as :
+                    - Position = X and Y coordinates, which is 10 bits each.
+                    - Pacman either being (LOCAL/FOREIGN) =  1 bit, sending 1 if LOCAL or 0 if FOREIGN.
+                    - Food type (POWER-PILL or NORMAL-PILL) = 1 bit, sending 1 if POWER-PILL or 0 if NORMAL-PILL.
+
+        - status update:
+                + The status represents which stage of the game is the player currently at. An integer from 0 to 5,
+                  shows the 6 different status in this game. STARTUP = 0, CHASE = 1, FRIGHTEN = 2, GAME_OVER = 3,
+                  NEXT_LEVEL_WAIT = 4, READY_TO_RESTART = 5. With the 6 status we have, a 3 bits is addressed for this
+                  update.
+
+        - score update:
+                + The score can be sent if the game has altered any change, as the score is countered to be adjusted,
+                  the score updates and the LOCAL computer sends an integer of the updated score to the remote.
+
+
+        - lives update:
+                + The lives represents how many lives are left of the pacman, starting from a solid 5 going
+                  decreasing till 0, which conclude death. An integer from 5 to 0. With the 5 lives we have,
+                  a 3 bits is addressed for this update.
+
+
+________________________________________________________________________________________________________________________
+
+=> The contents of a [ MOVEMENT ] message are:
+________________________________________________________________________________________________________________________
+
+
+    1. Type : MOVEMENT
+
+    2. Game Messages :
+
+        - pacman left:
+                + If the FOREIGN pacman has left the LOCAL maze an integer 1 is sent. Otherwise, an integer 0 is
+                  sent to the LOCAL computer.
+
+        - pacman arrived:
+                + An integer 1 is sent to indicate that the pacman has arrived at remote computer. Otherwise,
+                  an integer 0 is sent to the remote computer if the pacman has not arrived.
+
+                + ENTRANCE:
+                          An integer 1 is sent if pacman is arriving on the 'A' side of the REMOTE maze. Am integer
+                          0 is sent if pacman is arriving on the 'B' side of the REMOTE maze.
+
+
+
+========================================================================================================================
+
+                                               Message Timing
+
+========================================================================================================================
+
+=> PACMAN_UPDATE & GHOST_UPDATE :
+    As the Pacman game rolls, we can identy that the most game objects moving are both the pacman and ghosts, these
+    address that for every 20ms an update will be coming either from pacman or the ghost, bu having a 50 frames per
+    second. If and only if these messages can't be processed from the computer, a message every frame will be set.
+    Sending the messages after every frame is another way, thus the messages will over run the local updates itselt.
+
+=> MAZE_UPDATE :
+    A  message SHOULD only be sent once when a connection is SET between both players, and/or game is restarted
+    between the client or server.
+
+
+=> SCORE_UPDATE, STATUS_UPDATE & LIVES_UPDATE :
+    A message is sent every 16.7ms = 60 frames per second (fps).
+
+=> FOREIGN_PACMAN_ARRIVE & FOREIGN_PACMAN_LEFT :
+    - When the FOREIGN pacman enters local screen a message is sent.
+     and when
+    - When the FOREIGN pacman  re-enters the remote screen a message is sent..
+
+=> FOREIGN_PACMAN_DIED :
+    A message is sent when the FOREIGN pacman dies on the local screen.
+
+=> PACMAN_GO_HOME message :
+    A message is sent when the pacman dies when is AWAY on a remote screen and be resetted back to LOCAL.
+
+=> EAT :
+    A message is sent when the pacman consumes any food.
+
+=> FOREIGN_PACMAN_ATE_GHOST :
+    A message is sent when the FOREIGN pacman eats a LOCAL ghost.
+
+
+========================================================================================================================
+
+                                            Message Encoding
+
+========================================================================================================================
+
+
+=> Messages are fixed format, binary encoded, with all integer fields send in network byte order
+(i.e, big endian order).  As as message type is fixed forward, no explicit length field is required.
+More than one message MAY be send consecutively in a single packet.
+
+
+________________________________________________________________________________________________________________________
+-> INITIALIZE message format
+________________________________________________________________________________________________________________________
+
+INITIALIZE messages consist of 3 bytes, encoded as follows:
+
+   0               1               2               3
+   0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |  T  |A|  Password                 |   U       |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+        - U (Unused1): 6 bit, not used, but needed to maintain byte alignment.
+
+        - T: 3 bits type field.  Type=INITIALIZE has decimal value 0.
+
+        - Password: 14 bits, 2 bytes unsigned integer in big-endian byte order.
+
+        - A (Apply) : To check of password is correct or not, 1 bits unsigned integer in big-endian byte order.
+
+________________________________________________________________________________________________________________________
+-> UPDATES message format
+________________________________________________________________________________________________________________________
+
+UPDATES messages consist of 7 bytes, encoded as follows:
+
+   0               1               2               3
+   0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |  T  |    P_X            |       P_Y         |PD|
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   PS|    G_X            |    G_Y            | GM  |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    G  |S|D|   U   |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+
+        - T: 3 bit type field.  Type=UPDATES has decimal value 1.
+
+        - U (Unused1): 4 bit, not used, but needed to maintain byte alignment.
+
+        - Pacman
+            + Position:
+                P_X (x-coordinate) = From 0 to 1023, which handles 10 bits unsigned integer in big-endian byte order.
+                P_Y (y-coordinate) = From 0 to 1023, which handles 10 bits unsigned integer in big-endian byte order.
+
+            + PD (Direction) : 1 bits, giving an unsigned integer in big-endian byte order.
+
+            + PS (Speed) : 1 bits, giving an unsigned integer in big-endian byte order.
+
+        - Ghost
+            + Position:
+                G_X (x-coordinate) = From 0 to 1023, which handles 10 bits unsigned integer in big-endian byte order.
+                G_Y (y-coordinate) = From 0 to 1023, which handles 10 bits unsigned integer in big-endian byte order.
+
+            + D (Direction) : 1 bits, giving an unsigned integer in big-endian byte order.
+
+            + S (Speed) : 1 bits, giving an unsigned integer in big-endian byte order.
+
+            + GM (Mode) : 3 bits, giving an unsigned integer in big-endian byte order.
+
+            + G (Ghosts chosen) : 2 bits, giving an unsigned integer in big-endian byte order.
+
+________________________________________________________________________________________________________________________
+-> DIED message format
+________________________________________________________________________________________________________________________
+
+DIED messages consist of 1 bytes, encoded as follows:
+
+   0               1               2               3
+   0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |  T  |G|P|F| U |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+        - U (Unused1): 2 bit, not used, but needed to maintain byte alignment.
+
+        - T: 3 bit type field.  Type=DIED has decimal value 2.
+
+        - G (Ghost was eaten) : 1 bit, giving an unsigned integer in big-endian byte order.
+
+        - P (Pacman Died) : 1 bit, giving an unsigned integer in big-endian byte order.
+
+        - F (Forigen pacman ate ghost) : 1 bit, giving an unsigned integer in big-endian byte order.
+
+________________________________________________________________________________________________________________________
+-> ALERTS message format
+________________________________________________________________________________________________________________________
+
+ALERTS messages consist of 8 bytes, encoded as follows:
+
+   0               1               2               3
+   0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |  T  |    E_X            |       E_Y         |F|
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |E|ST   |LU   |              SU
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+            SU(cont)             |P|
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+
+        - T: 3 bit type field.  Type=ALERTS has decimal value 3.
+
+        - E (Pacman go home) : 1 bits, giving an unsigned integer in big-endian byte order.
+
+        - Eat :
+
+            +Position:
+               - (E_X) X-coordinates : 10 bits, giving an unsigned integer in big-endian byte order.
+               - (E_Y) Y-coordinates : 10 bits, giving an unsigned integer in big-endian byte order.
+
+            + P - Pacman (Local/FOREIGN):
+                - 1 bit, giving an unsigned integer in big-endian byte order.
+
+            + F - Food Type (Power-pill/Normal-pill) :
+                - 1 bit, giving an unsigned integer in big-endian byte order.
+
+        - ST (Status update) : 3 bits, giving an unsigned integer in big-endian byte order.
+
+        - SU (Score update) : 32 bits, giving an unsigned integer in big-endian byte order.
+
+        - LU (Lives update) : 3 bits, giving an unsigned integer in big-endian byte order.
+
+________________________________________________________________________________________________________________________
+-> MOVEMENT message format
+________________________________________________________________________________________________________________________
+MOVEMENT messages consist of 1 byte , encoded as follows:
+
+   0               1               2               3
+   0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   | T   |L|A|E| U |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+
+        - T: 3 bit type field.  Type=ALERTS has decimal value 4.
+
+        - U (Unused1): 2 bit, not used, but needed to maintain byte alignment.
+
+        - L (Pacman left): 1 bit, giving an unsigned integer in big-endian byte order.
+
+        - A (Pacman arrived): 1 bit, giving an unsigned integer in big-endian byte order.
+
+        - E (Pacman Entrance): 1 bits, giving an unsigned integer in big-endian byte order.
+
+________________________________________________________________________________________________________________________
+-> MAZE message format
+________________________________________________________________________________________________________________________
+
+MAZE messages consist of 438 bytes, encoded as follows:
+
+   0               1               2               3
+   0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |  T  |Block1 |U|Bock2  |Block3 |Block4 |Block5 |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |Block6 |Bock7  |Block8 |Block9 |Block10|Block11|
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    .....................................->|Block868|
+
+        - T: 3 bit type field.  Type=ALERTS has decimal value 5.
+
+        - U (Unused1): 1 bit, not used, but needed to maintain byte alignment.
+
+        - Block : 4 bits, giving an unsigned integer in big-endian byte order.
+
+________________________________________________________________________________________________________________________
+
+========================================================================================================================
+====================================    - - - - - - - - - - - - - - - - -    ===========================================
+====================================   |  Pacman Protocol Specification  |   ===========================================
+====================================    - - - - - - - - - - - - - - - - -    ===========================================
+========================================================================================================================
+
+References :
+
+    - M.Handley (2022) 'Pong v1 Protocol Specification' from
+      https://github.com/mhandley/ENGF2-2022/blob/master/video15-pong/pong_v1.txt
+
+    - The assignment 5 pdf 'Pacman Protocol Specification'
+      https://github.com/mhandley/ENGF2-2022/blob/master/assignments/assignment5/assignment.pdf
